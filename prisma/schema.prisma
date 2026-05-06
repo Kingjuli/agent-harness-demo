@@ -94,3 +94,20 @@ model EscalationTicket {
 
   @@index([sessionId, createdAt])
 }
+
+model ShippingLocation {
+  id           String   @id
+  code         String   @unique
+  address      String
+  city         String
+  zone         String
+  shippingCents Int     @map("shipping_cents")
+  etaDays      Int      @map("eta_days")
+  service      String
+  embedding    Unsupported("vector(12)")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([city])
+  @@index([zone])
+}

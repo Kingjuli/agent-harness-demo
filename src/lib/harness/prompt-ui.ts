@@ -3,16 +3,16 @@ import { missingCustomerFields } from "@/lib/harness/state-machine";
 import { hasCustomerDetailsFormTag, hasSuccessfulToolCall, extractProductSkusForUi, lookupProductsBySku, pickTopConfidenceBlock } from "@/lib/harness/ui-block-utils";
 import { sanitizeCustomerResponse } from "@/lib/harness/response-sanitizer";
 import { AgentTurnResult, SessionState, ToolTrace } from "@/lib/types/domain";
-import { buildAgentPromptText, buildNoToolsPromptText } from "@/lib/harness/prompt-policy";
+import { buildAgentPromptChain, buildNoToolsPromptChain } from "@/lib/prompting";
 import { ResponseStyle } from "@/lib/harness/types";
 export { sanitizeCustomerResponse };
 
 export function agentPrompt(state: SessionState, responseStyle: ResponseStyle, context: { stateText: string; catalogText: string }) {
-  return buildAgentPromptText(state, responseStyle, context);
+  return buildAgentPromptChain({ state, responseStyle, context });
 }
 
 export function noToolsPrompt(state: SessionState, responseStyle: ResponseStyle) {
-  return buildNoToolsPromptText(state, responseStyle);
+  return buildNoToolsPromptChain(state, responseStyle);
 }
 
 export function buildUiBlocks(input: { assistantMessage: string; updatedState: SessionState; traces: ToolTrace[] }): AgentTurnResult["ui"] {

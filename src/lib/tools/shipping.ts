@@ -1,6 +1,7 @@
 // Shipping quote tool for checkout totals.
 import { z } from "zod";
 import { ToolDefinition } from "@/lib/tools/contracts";
+import { searchShippingCandidatesViaMcp } from "@/lib/mcp/shipping-client";
 
 export const shippingQuoteInput = z.object({
   address: z.string().min(3),
@@ -14,16 +15,20 @@ export const shippingQuoteOutput = z.object({
 
 export const shippingQuoteTool: ToolDefinition<typeof shippingQuoteInput, typeof shippingQuoteOutput> = {
   name: "shipping_quote",
-  description: "Generate shipping estimate based on address.",
+  description: "Generate shipping estimate based on address via MCP shipping service.",
   inputSchema: shippingQuoteInput,
   outputSchema: shippingQuoteOutput,
   async execute(input) {
-    const normalized = input.address.toLowerCase();
-    const nearCity = normalized.includes("nairobi") || normalized.includes("kilimani") || normalized.includes("westlands");
+    const candidates = await searchShippingCandidatesViaMcp(input.address);
+    const best = candidates[0];
+    if (!best) {
+      throw new Error("No shipping candidates returned by MCP server");
+    }
+
     return {
-      shippingCents: nearCity ? 500 : 900,
-      etaDays: nearCity ? 1 : 3,
-      service: nearCity ? "City Express" : "Standard Courier",
+      shippingCents: best.shippingCents,
+      etaDays: best.etaDays,
+      service: best.service,
     };
   },
 };
