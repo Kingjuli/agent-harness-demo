@@ -1,3 +1,4 @@
+// Canonical domain models shared across runtime, tools, and UI.
 export type Role = "user" | "assistant" | "system";
 
 export type WorkflowStep =
@@ -178,11 +179,80 @@ export interface ToolTrace {
   reason?: string;
 }
 
+export interface CartCardUiBlock {
+  type: "cart_card";
+  version: 1;
+  data: {
+    items: CartItem[];
+    subtotalCents: number;
+    shippingCents: number;
+    totalCents: number;
+    currency: "USD";
+    itemCount: number;
+  };
+}
+
+export interface CustomerDetailsInputUiBlock {
+  type: "customer_details_input_card";
+  version: 1;
+  data: {
+    title: string;
+    description?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+  };
+}
+
+export interface ProductListUiBlock {
+  type: "product_list_card";
+  version: 1;
+  data: {
+    title: string;
+    products: Array<{
+      sku: string;
+      name: string;
+      category: Product["category"];
+      color: string;
+      size: Product["size"];
+      priceCents: number;
+      stock: number;
+    }>;
+  };
+}
+
+export type AgentUiBlock = CartCardUiBlock | CustomerDetailsInputUiBlock | ProductListUiBlock;
+
+export interface ContextUsageCategory {
+  key: "history" | "workflow_state" | "catalog" | "reasoning_trace" | "tool_contracts";
+  usedTokens: number;
+  maxTokens: number;
+  usagePercent: number;
+  detail: string;
+}
+
+export interface ContextUsageSummary {
+  modelContextWindowTokens: number;
+  reservedOutputTokens: number;
+  safetyBufferTokens: number;
+  maxContextTokens: number;
+  totalUsedTokens: number;
+  totalUsagePercent: number;
+  categories: ContextUsageCategory[];
+}
+
 export interface AgentTurnResult {
   assistantMessage: string;
   updatedState: SessionState;
   toolTrace: ToolTrace[];
   harnessEvents: HarnessEvent[];
+  ui?: AgentUiBlock[];
+  contextUsage?: ContextUsageSummary;
   reasoningTrace?: string[];
+  requiresToolApproval?: boolean;
+  approvalRequestId?: string;
+  requestedTools?: string[];
+  approvalReason?: string;
   status: "ok" | "needs_input" | "escalated" | "error";
 }

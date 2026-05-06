@@ -1,3 +1,4 @@
+// Tests for checkout guardrail behavior.
 import { describe, expect, it } from "vitest";
 import { createEmptyState } from "@/lib/harness/state";
 import { validateStateForCheckout } from "@/lib/harness/guardrails";

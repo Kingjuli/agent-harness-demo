@@ -1,3 +1,4 @@
+// Order creation tool backed by persistence.
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { makeRef } from "@/lib/utils/id";

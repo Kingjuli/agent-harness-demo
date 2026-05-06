@@ -1,3 +1,4 @@
+// Demo seed data used by tools and UI flows.
 import { DemoUser, Product } from "@/lib/types/domain";
 
 export const DEMO_USERS: DemoUser[] = [

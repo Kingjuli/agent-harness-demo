@@ -1,3 +1,4 @@
+// Conversation serialization helpers for API responses and UI hydration.
 import { AgentMessage, ConversationDetail, ConversationSummary, SessionState, WorkflowStep } from "@/lib/types/domain";
 
 type PersistedConversationMessage = {

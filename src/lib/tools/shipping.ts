@@ -1,3 +1,4 @@
+// Shipping quote tool for checkout totals.
 import { z } from "zod";
 import { ToolDefinition } from "@/lib/tools/contracts";
 

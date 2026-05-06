@@ -188,7 +188,7 @@ export default function StorefrontPage() {
                       onClick={() =>
                         window.dispatchEvent(
                           new CustomEvent("moringa:chat-intent", {
-                            detail: { prompt: `Add ${p.name} (${p.color}, size ${p.size}) to my cart.` },
+                            detail: { prompt: `Add SKU ${p.sku} (${p.name}, ${p.color}, size ${p.size}) to my cart.` },
                           }),
                         )
                       }

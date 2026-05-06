@@ -1,3 +1,4 @@
+// Catalog lookup tool and schema definitions.
 import { z } from "zod";
 import { PRODUCT_CATALOG } from "@/lib/data/seeds";
 import { ToolDefinition } from "@/lib/tools/contracts";

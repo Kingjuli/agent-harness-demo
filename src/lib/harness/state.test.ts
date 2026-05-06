@@ -1,3 +1,4 @@
+// Tests for session state initialization and defaults.
 import { describe, expect, it } from "vitest";
 import { serializeConversationDetail, serializeConversationMessages, serializeConversationSummary } from "@/lib/harness/conversation";
 import { createEmptyState } from "@/lib/harness/state";

@@ -1,3 +1,4 @@
+// Guardrail checks that gate risky workflow transitions.
 import { SessionState } from "@/lib/types/domain";
 
 export function validateStateForCheckout(state: SessionState): { ok: boolean; reason?: string } {

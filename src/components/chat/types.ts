@@ -1,4 +1,4 @@
-import type { AgentMessage, AgentTurnResult, ConversationDetail, ConversationSummary } from "@/lib/types/domain";
+import type { AgentMessage, AgentTurnResult, CartCardUiBlock, ConversationDetail, ConversationSummary, CustomerDetailsInputUiBlock, ProductListUiBlock } from "@/lib/types/domain";
 
 export type ChatMessage = Pick<AgentMessage, "role" | "content">;
 export type AgentChatResponse = AgentTurnResult | { error?: string };
@@ -8,6 +8,9 @@ export type SessionDetailResponse = ConversationDetail & SessionApiError;
 export type HarnessPhase = "Talking" | "Planning" | "Executing" | "Blocked" | "Recovering";
 export type TimelineItem =
   | { id: string; kind: "message"; role: "user" | "assistant"; content: string }
+  | { id: string; kind: "card"; cardType: "cart"; data: CartCardUiBlock["data"] }
+  | { id: string; kind: "card"; cardType: "customer-details-input"; data: CustomerDetailsInputUiBlock["data"] }
+  | { id: string; kind: "card"; cardType: "product-list"; data: ProductListUiBlock["data"] }
   | { id: string; kind: "event"; stage: string; title: string; detail: string; ok: boolean }
   | { id: string; kind: "tool"; tool: string; ok: boolean; reason?: string; input: unknown; output: unknown }
   | {

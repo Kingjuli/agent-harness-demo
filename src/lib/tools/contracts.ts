@@ -1,3 +1,4 @@
+// Shared tool interface and execution context types.
 import { z } from "zod";
 import { SessionState } from "@/lib/types/domain";
 

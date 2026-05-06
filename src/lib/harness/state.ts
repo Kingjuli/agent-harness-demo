@@ -1,3 +1,4 @@
+// Factory helpers for initializing a new session state.
 import { SessionState } from "@/lib/types/domain";
 
 export function createEmptyState(sessionId: string, userId: string): SessionState {

@@ -1,3 +1,4 @@
+// Human escalation tool for creating support tickets.
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { ToolDefinition } from "@/lib/tools/contracts";

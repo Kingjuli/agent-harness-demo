@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AgentTurnResult, ConversationSummary, HarnessEvent, SessionState, ToolTrace } from "@/lib/types/domain";
+import type { AgentTurnResult, AgentUiBlock, ContextUsageSummary, ConversationSummary, HarnessEvent, SessionState, ToolTrace } from "@/lib/types/domain";
 import type { ReasoningEffort } from "@/lib/llm/openai";
+import type { ToolPermission } from "@/lib/harness/types";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { ChatTimeline } from "@/components/chat/chat-timeline";
 import { shortJson, statusTone, type AgentChatResponse, type ChatMessage, type SessionDetailResponse, type SessionListResponse, type TimelineItem } from "@/components/chat/types";
@@ -27,11 +28,19 @@ type RunLog = {
   assistantMessage?: string;
 };
 
+type PendingToolApproval = {
+  approvalRequestId: string;
+  requestedTools: string[];
+  reason?: string;
+  requestedAt: number;
+};
+
 type AgentWireEvent =
   | { type: "event"; event: HarnessEvent }
   | { type: "tool_start"; tool: string; input: unknown }
   | { type: "tool_end"; trace: ToolTrace }
   | { type: "token"; token: string }
+  | { type: "reasoning"; text: string }
   | { type: "final"; result: AgentTurnResult }
   | { type: "complete" }
   | { type: "error"; error: string };
@@ -82,6 +91,22 @@ function traceFromResponse(runId: string, events: HarnessEvent[], tools: ToolTra
   ];
 }
 
+function uiBlocksToTimeline(runId: string, blocks: AgentUiBlock[] | undefined): TimelineItem[] {
+  if (!Array.isArray(blocks) || blocks.length === 0) return [];
+  return blocks.flatMap((block, index): TimelineItem[] => {
+    if (block.type === "cart_card") {
+      return [{ id: `ui-${runId}-cart-${index}`, kind: "card", cardType: "cart", data: block.data }];
+    }
+    if (block.type === "customer_details_input_card") {
+      return [{ id: `ui-${runId}-customer-details-${index}`, kind: "card", cardType: "customer-details-input", data: block.data }];
+    }
+    if (block.type === "product_list_card") {
+      return [{ id: `ui-${runId}-products-${index}`, kind: "card", cardType: "product-list", data: block.data }];
+    }
+    return [];
+  });
+}
+
 function defaultTrace(runId: string): LiveTraceStep[] {
   return [
     { id: `${runId}-request`, label: "Request", detail: "Message queued for the agent", status: "done" },
@@ -104,15 +129,24 @@ export function AgentChatWidget() {
   const runCounterRef = useRef(1);
   const runStartedAtRef = useRef<Record<string, number>>({});
   const apiCopyIndexRef = useRef(0);
+  const phaseDisplayTimerRef = useRef<number | null>(null);
+  const phaseSwapTimerRef = useRef<number | null>(null);
+  const phaseShownAtRef = useRef(0);
+  const activePhaseRef = useRef("");
+  const tokenStartedRef = useRef(false);
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const [reasoningMenuOpen, setReasoningMenuOpen] = useState(false);
   const [runsMenuOpen, setRunsMenuOpen] = useState(false);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [paused, setPaused] = useState(false);
   const [responseStyle, setResponseStyle] = useState<"brief" | "standard" | "detailed">("standard");
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>("medium");
+  const [toolPermission, setToolPermission] = useState<ToolPermission>("allow");
+  const [pendingToolApproval, setPendingToolApproval] = useState<PendingToolApproval | null>(null);
+  const [toolApprovalNotice, setToolApprovalNotice] = useState<string>("");
   const [sessionId, setSessionId] = useState("");
   const [userId, setUserId] = useState("");
   const [chatInput, setChatInput] = useState("");
@@ -127,7 +161,51 @@ export function AgentChatWidget() {
   const [replaying, setReplaying] = useState(false);
   const [liveTrace, setLiveTrace] = useState<LiveTraceStep[]>([]);
   const [streamingDraft, setStreamingDraft] = useState("");
+  const [streamingReasoning, setStreamingReasoning] = useState("");
   const [thinkingLabel, setThinkingLabel] = useState("");
+  const [contextUsageSummary, setContextUsageSummary] = useState<ContextUsageSummary | null>(null);
+
+  function clearPhaseTimers() {
+    if (phaseDisplayTimerRef.current) window.clearTimeout(phaseDisplayTimerRef.current);
+    if (phaseSwapTimerRef.current) window.clearTimeout(phaseSwapTimerRef.current);
+    phaseDisplayTimerRef.current = null;
+    phaseSwapTimerRef.current = null;
+  }
+
+  function setPhaseNow(label: string) {
+    setThinkingLabel(label);
+    activePhaseRef.current = label;
+    phaseShownAtRef.current = Date.now();
+  }
+
+  function schedulePhase(
+    label: string,
+    options?: { debounceMs?: number; minVisibleMs?: number; force?: boolean; allowAfterToken?: boolean },
+  ) {
+    if (tokenStartedRef.current && !options?.allowAfterToken) return;
+    if (activePhaseRef.current === label) return;
+
+    const debounceMs = options?.debounceMs ?? 360;
+    const minVisibleMs = options?.minVisibleMs ?? 420;
+    const force = options?.force ?? false;
+
+    const run = () => {
+      const elapsed = Date.now() - phaseShownAtRef.current;
+      const waitBeforeSwap = activePhaseRef.current ? Math.max(0, minVisibleMs - elapsed) : 0;
+      if (phaseSwapTimerRef.current) window.clearTimeout(phaseSwapTimerRef.current);
+      phaseSwapTimerRef.current = window.setTimeout(() => {
+        setPhaseNow(label);
+      }, waitBeforeSwap);
+    };
+
+    if (force) {
+      run();
+      return;
+    }
+
+    if (phaseDisplayTimerRef.current) window.clearTimeout(phaseDisplayTimerRef.current);
+    phaseDisplayTimerRef.current = window.setTimeout(run, debounceMs);
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -135,6 +213,7 @@ export function AgentChatWidget() {
       setUserId(localStorage.getItem("demo_user_id") ?? "");
       setResponseStyle((localStorage.getItem("demo_response_style") as "brief" | "standard" | "detailed" | null) ?? "standard");
       setReasoningEffort((localStorage.getItem("demo_reasoning_effort") as ReasoningEffort | null) ?? "medium");
+      setToolPermission((localStorage.getItem("demo_tool_permission") as ToolPermission | null) ?? "allow");
       setMounted(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -170,6 +249,10 @@ export function AgentChatWidget() {
         setRuns([]);
         setLiveTrace([]);
         setStreamingDraft("");
+        setStreamingReasoning("");
+        setPendingToolApproval(null);
+        setToolApprovalNotice("");
+        setContextUsageSummary(null);
       } finally {
         if (!cancelled) setSessionLoading(false);
       }
@@ -205,6 +288,10 @@ export function AgentChatWidget() {
       if (runsMenuOpen && runsMenuRef.current && !runsMenuRef.current.contains(target)) {
         setRunsMenuOpen(false);
       }
+      if (contextMenuOpen) {
+        const contextHost = (target as HTMLElement).closest("[data-context-menu='root']");
+        if (!contextHost) setContextMenuOpen(false);
+      }
       if (!containerRef.current.contains(target)) {
         setOpen(false);
       }
@@ -213,7 +300,7 @@ export function AgentChatWidget() {
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [open, sessionMenuOpen, actionsMenuOpen, reasoningMenuOpen, runsMenuOpen]);
+  }, [open, sessionMenuOpen, actionsMenuOpen, reasoningMenuOpen, runsMenuOpen, contextMenuOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -223,6 +310,10 @@ export function AgentChatWidget() {
       document.body.style.overflow = previousOverflow;
     };
   }, [open]);
+
+  useEffect(() => {
+    return () => clearPhaseTimers();
+  }, []);
 
   function hydrateTimelineFromMessages(nextMessages: ChatMessage[]) {
     return nextMessages.map((message, index): TimelineItem => ({
@@ -264,6 +355,10 @@ export function AgentChatWidget() {
       setRuns([]);
       setLiveTrace([]);
       setStreamingDraft("");
+      setStreamingReasoning("");
+      setPendingToolApproval(null);
+      setToolApprovalNotice("");
+      setContextUsageSummary(null);
       await refreshConversationIndex(data.sessionId);
     } finally {
       setLoading(false);
@@ -289,7 +384,10 @@ export function AgentChatWidget() {
       setRuns([]);
       setLiveTrace([]);
       setStreamingDraft("");
+      setStreamingReasoning("");
       setChatInput("");
+      setPendingToolApproval(null);
+      setContextUsageSummary(null);
       await refreshConversationIndex(data.sessionId);
     } finally {
       setLoading(false);
@@ -355,6 +453,7 @@ export function AgentChatWidget() {
       onToolStart: (toolName: string, input: unknown) => void;
       onToolEnd: (trace: ToolTrace) => void;
       onToken: (token: string) => void;
+      onReasoning: (text: string) => void;
       onFinal: (result: AgentTurnResult) => void;
     },
   ) {
@@ -381,16 +480,19 @@ export function AgentChatWidget() {
         if (eventData.type === "tool_start") handlers.onToolStart(eventData.tool, eventData.input);
         if (eventData.type === "tool_end") handlers.onToolEnd(eventData.trace);
         if (eventData.type === "token") handlers.onToken(eventData.token);
+        if (eventData.type === "reasoning") handlers.onReasoning(eventData.text);
         if (eventData.type === "final") handlers.onFinal(eventData.result);
         if (eventData.type === "error") throw new Error(eventData.error);
       }
     }
   }
 
-  async function sendMessage(text: string) {
+  async function sendMessage(text: string, options?: { toolPermissionOverride?: ToolPermission }) {
     if (!text.trim() || !sessionId || loading || paused) return;
     setLoading(true);
-    setThinkingLabel("Thinking through your request");
+    clearPhaseTimers();
+    tokenStartedRef.current = false;
+    setPhaseNow("Reading request");
     const userText = text.trim();
     setChatInput("");
     setLastPrompt(userText);
@@ -415,13 +517,22 @@ export function AgentChatWidget() {
     setTimeline((prev) => [...prev, { id: `msg-user-${runId}`, kind: "message", role: "user", content: userText }]);
     setLiveTrace(defaultTrace(runId));
     setStreamingDraft("");
+    setStreamingReasoning("");
 
     try {
-      setThinkingLabel("Connecting to agent runtime");
+      schedulePhase("Planning next action");
       const res = await fetch("/api/agent/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, userMessage: userText, maxTurns: 6, stream: true, responseStyle, reasoningEffort }),
+        body: JSON.stringify({
+          sessionId,
+          userMessage: userText,
+          maxTurns: 6,
+          stream: true,
+          responseStyle,
+          reasoningEffort,
+          toolPermission: options?.toolPermissionOverride ?? toolPermission,
+        }),
       });
 
       if (!res.ok) {
@@ -431,12 +542,16 @@ export function AgentChatWidget() {
 
       const streamedEvents: HarnessEvent[] = [];
       const streamedTrace: ToolTrace[] = [];
+      const streamedReasoning: string[] = [];
       const finalResult: { current: AgentTurnResult | null } = { current: null };
 
       await readAgentStream(res, {
         onEvent: (eventData) => {
           streamedEvents.push(eventData);
-          setThinkingLabel(`Planning: ${eventData.title}`);
+          schedulePhase(
+            eventData.stage === "observe" ? "Reading request" : eventData.stage === "plan" ? "Planning next action" : "Reviewing state",
+            { debounceMs: 320 },
+          );
           setLiveTrace((prev) =>
             upsertTraceStep(prev, {
               id: `${runId}-event-${streamedEvents.length}`,
@@ -453,7 +568,7 @@ export function AgentChatWidget() {
             "Fetching data... tiny network adventure in progress",
             "Tool call running... brewing fresh results",
           ];
-          setThinkingLabel(apiCopy[apiCopyIndexRef.current % apiCopy.length]);
+          schedulePhase(apiCopy[apiCopyIndexRef.current % apiCopy.length], { debounceMs: 260 });
           apiCopyIndexRef.current += 1;
           setLiveTrace((prev) =>
             upsertTraceStep(prev, {
@@ -466,7 +581,7 @@ export function AgentChatWidget() {
         },
         onToolEnd: (trace) => {
           streamedTrace.push(trace);
-          setThinkingLabel(`Tool completed: ${trace.tool}`);
+          schedulePhase(`Completed ${trace.tool.replace(/_/g, " ")}`, { debounceMs: 260 });
           setLiveTrace((prev) =>
             upsertTraceStep(prev, {
               id: `${runId}-tool-${trace.tool}`,
@@ -477,11 +592,17 @@ export function AgentChatWidget() {
           );
         },
         onToken: (token) => {
-          setThinkingLabel("Writing response");
+          tokenStartedRef.current = true;
+          schedulePhase("Writing response", { force: true, allowAfterToken: true });
           setStreamingDraft((prev) => `${prev}${token}`);
         },
+        onReasoning: (text) => {
+          schedulePhase("Reasoning", { debounceMs: 220, allowAfterToken: true });
+          streamedReasoning.push(text);
+          setStreamingReasoning((prev) => `${prev}${text}`);
+        },
         onFinal: (result) => {
-          setThinkingLabel("Finalizing response");
+          schedulePhase("Finalizing response", { force: true, allowAfterToken: true });
           finalResult.current = result;
         },
       });
@@ -489,6 +610,7 @@ export function AgentChatWidget() {
       if (!finalResult.current) throw new Error("The stream ended before the final agent result arrived.");
 
       const data = finalResult.current;
+      setContextUsageSummary(data.contextUsage ?? null);
       const nextTrace = Array.isArray(data.toolTrace) ? data.toolTrace : streamedTrace;
       const nextEvents = Array.isArray(data.harnessEvents) ? data.harnessEvents : streamedEvents;
       const previousState = state;
@@ -504,9 +626,22 @@ export function AgentChatWidget() {
         reasoning:
           Array.isArray(data.reasoningTrace) && data.reasoningTrace.length > 0
             ? data.reasoningTrace
+            : streamedReasoning.join("").trim()
+              ? [streamedReasoning.join("").trim()]
             : nextEvents.map((ev) => `${ev.title}: ${ev.detail}`),
         assistantMessage: data.assistantMessage,
       });
+
+      if (data.requiresToolApproval && data.approvalRequestId) {
+        setPendingToolApproval({
+          approvalRequestId: data.approvalRequestId,
+          requestedTools: Array.isArray(data.requestedTools) ? data.requestedTools : [],
+          reason: data.approvalReason,
+          requestedAt: Date.now(),
+        });
+      } else {
+        setPendingToolApproval(null);
+      }
 
       const blocked = nextEvents.some((ev) => !ev.ok) || nextTrace.some((tool) => !tool.ok);
       const durationMs = Math.round(window.performance.now() - (runStartedAtRef.current[runId] ?? window.performance.now()));
@@ -532,8 +667,9 @@ export function AgentChatWidget() {
           trace: traceItems,
         },
         { id: `msg-assistant-${runId}`, kind: "message", role: "assistant", content: data.assistantMessage },
+        ...uiBlocksToTimeline(runId, data.ui),
       ]);
-      setThinkingLabel(blocked ? "Completed with issues" : "Response ready");
+      schedulePhase(blocked ? "Completed with issues" : "Response ready", { force: true, allowAfterToken: true });
 
       updateRun(runId, {
         status: blocked ? "blocked" : "done",
@@ -542,7 +678,7 @@ export function AgentChatWidget() {
       void refreshConversationIndex();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "I could not complete that turn. Please try again.";
-      setThinkingLabel("Hit a snag while processing");
+      schedulePhase("Hit a snag while processing", { force: true, allowAfterToken: true });
       setLiveTrace((prev) => prev.map((step) => (step.status === "active" ? { ...step, status: "failed", detail: errorMessage } : step)));
       setTimeline((prev) => [...prev, { id: `msg-assistant-error-${runId}`, kind: "message", role: "assistant", content: errorMessage }]);
       updateRun(runId, { status: "failed", durationMs: Math.round(window.performance.now() - (runStartedAtRef.current[runId] ?? window.performance.now())) });
@@ -550,12 +686,85 @@ export function AgentChatWidget() {
       delete runStartedAtRef.current[runId];
       setLiveTrace([]);
       setStreamingDraft("");
+      setStreamingReasoning("");
+      setLoading(false);
+    }
+  }
+
+  async function respondToToolApproval(approved: boolean) {
+    if (!pendingToolApproval || !sessionId || loading) return;
+    const approvalRequestId = pendingToolApproval.approvalRequestId;
+    const requestedTools = pendingToolApproval.requestedTools;
+    setPendingToolApproval(null);
+    setToolApprovalNotice(approved ? `Tools approved: ${requestedTools.join(", ") || "requested tools"}` : "Tool request denied");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/agent/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          userMessage: "",
+          approvalRequestId,
+          approved,
+          stream: false,
+        }),
+      });
+      const data = (await res.json()) as AgentChatResponse;
+      if (!res.ok || ("error" in data && data.error)) {
+        throw new Error("error" in data ? data.error : "Failed to process tool approval.");
+      }
+
+      if ("updatedState" in data && data.updatedState) {
+        setContextUsageSummary(data.contextUsage ?? null);
+        setState(data.updatedState);
+        const runId = `approval-${Date.now()}`;
+        setTimeline((prev) => [
+          ...prev,
+          {
+            id: `run-summary-${runId}`,
+            kind: "run-summary",
+            title: approved ? "Tool Approval: Approved" : "Tool Approval: Denied",
+            status: "done",
+            detail: approved ? "Pending request executed with tools." : "Pending request executed without tools.",
+            durationMs: 0,
+            toolCount: Array.isArray(data.toolTrace) ? data.toolTrace.length : 0,
+            steps: ["approval", approved ? "execute_with_tools" : "execute_without_tools", "response"],
+            trace: traceFromResponse(runId, Array.isArray(data.harnessEvents) ? data.harnessEvents : [], Array.isArray(data.toolTrace) ? data.toolTrace : []),
+          },
+          { id: `msg-assistant-${runId}`, kind: "message", role: "assistant", content: data.assistantMessage },
+          ...uiBlocksToTimeline(runId, data.ui),
+        ]);
+      }
+      setToolApprovalNotice(approved ? "Tools approved and executed." : "Tool request denied. Continued without tools.");
+      void refreshConversationIndex();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to process tool approval.";
+      setToolApprovalNotice("Tool approval request failed.");
+      setTimeline((prev) => [...prev, { id: `msg-assistant-approval-error-${Date.now()}`, kind: "message", role: "assistant", content: errorMessage }]);
+    } finally {
       setLoading(false);
     }
   }
 
   const footerStatus = useMemo(() => state?.payment?.status ?? "not-started", [state?.payment?.status]);
   const pendingRuns = runs.filter((run) => run.status === "running" || run.status === "blocked").length;
+  const contextUsage = useMemo(() => {
+    if (!contextUsageSummary) {
+      return {
+        percent: 0,
+        sources: [{ label: "Context", value: "No server context usage captured yet", percent: 0 }],
+      };
+    }
+    return {
+      percent: contextUsageSummary.totalUsagePercent,
+      sources: contextUsageSummary.categories.map((category) => ({
+        label: category.key.replace(/_/g, " "),
+        value: `${category.usedTokens}/${category.maxTokens} tokens`,
+        percent: category.usagePercent,
+      })),
+    };
+  }, [contextUsageSummary]);
 
   if (!mounted || !userId || !sessionId) return null;
 
@@ -607,33 +816,77 @@ export function AgentChatWidget() {
                   thinkingLabel={thinkingLabel}
                   nextStepDisabled={loading || paused}
                   onNextStepClick={(value) => void sendMessage(value)}
+                  onProductPick={(value) => void sendMessage(value)}
+                  onCustomerDetailsSubmit={(value) =>
+                    void sendMessage(
+                      `Here are my details: name=${value.name ?? ""}; email=${value.email ?? ""}; phone=${value.phone ?? ""}; address=${value.address ?? ""}. Please update and confirm.`,
+                    )
+                  }
                 />
               </div>
 
-              <div className="mt-3 shrink-0 rounded-lg app-soft p-2">
-                <div className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
-                  <span className="app-muted">Workflow: <span className="font-medium text-[var(--foreground)]">{state?.workflowStep?.replace(/_/g, " ") ?? "browsing"}</span></span>
-                  <span className="app-muted">Mode: <span className="font-medium text-[var(--foreground)]">{state?.harness?.currentMode ?? "Talking"}</span></span>
-                  <span className="app-muted">Cart: <span className="font-medium text-[var(--foreground)]">{state?.cart.totalCents ?? 0}c</span></span>
-                  <span className="app-muted">Payment: <span className={`font-medium ${statusTone(footerStatus)}`}>{footerStatus}</span></span>
-                  <span className="app-muted">Loop: <span className="font-medium text-[var(--foreground)]">{state?.harness?.loopCount ?? 0}</span></span>
+              <div className="mt-3 shrink-0 rounded-xl border border-black/10 bg-[color-mix(in_oklab,var(--surface-soft)_90%,var(--surface)_10%)] p-2.5 dark:border-white/10">
+                {pendingToolApproval ? (
+                  <div className="mb-1.5 rounded-md border border-amber-500/20 bg-amber-500/5 px-2 py-1.5 text-[11px]">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-semibold text-amber-700 dark:text-amber-300">Tool permission requested</span>
+                      <span className="app-muted">{pendingToolApproval.reason ?? "Approve to continue with tool-backed actions."}</span>
+                      {pendingToolApproval.requestedTools.length > 0 ? (
+                        <span className="app-muted">Tools: {pendingToolApproval.requestedTools.join(", ")}</span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <button
+                        onClick={() => void respondToToolApproval(true)}
+                        disabled={loading || paused}
+                        className="rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => void respondToToolApproval(false)}
+                        disabled={loading}
+                        className="app-soft rounded-md px-2 py-0.5 text-[11px] font-semibold disabled:opacity-50"
+                      >
+                        Deny
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {!pendingToolApproval && toolApprovalNotice ? (
+                  <div className="mb-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2 py-1 text-[11px] text-emerald-700 dark:text-emerald-300">
+                    {toolApprovalNotice}
+                  </div>
+                ) : null}
+                <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                  <span className="rounded-full app-surface px-2 py-0.5 app-muted">Workflow: <span className="font-medium text-[var(--foreground)]">{state?.workflowStep?.replace(/_/g, " ") ?? "browsing"}</span></span>
+                  <span className="rounded-full app-surface px-2 py-0.5 app-muted">Mode: <span className="font-medium text-[var(--foreground)]">{state?.harness?.currentMode ?? "Talking"}</span></span>
+                  <span className="rounded-full app-surface px-2 py-0.5 app-muted">Cart: <span className="font-medium text-[var(--foreground)]">{state?.cart.totalCents ?? 0}c</span></span>
+                  <span className={`rounded-full px-2 py-0.5 app-muted ${statusTone(footerStatus)}`}>Payment: <span className="font-medium">{footerStatus}</span></span>
+                  <span className="rounded-full app-surface px-2 py-0.5 app-muted">Loop: <span className="font-medium text-[var(--foreground)]">{state?.harness?.loopCount ?? 0}</span></span>
                 </div>
 
-                <div className="flex gap-2">
-                  <input
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void sendMessage(chatInput);
-                  }}
-                    placeholder={paused ? "Assistant paused..." : "Ask for product recommendations or continue checkout..."}
-                    className="app-soft flex-1 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2"
-                    disabled={paused}
-                  />
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 rounded-xl border border-black/10 app-surface px-2.5 py-2 dark:border-white/10">
+                    <textarea
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          void sendMessage(chatInput);
+                        }
+                      }}
+                      placeholder={paused ? "Assistant paused..." : "Ask for product recommendations or continue checkout..."}
+                      rows={2}
+                      className="min-h-[3rem] w-full resize-y bg-transparent text-sm leading-relaxed outline-none placeholder:app-muted"
+                      disabled={paused}
+                    />
+                  </div>
                   <button
                     onClick={() => void startNewConversation()}
                     disabled={loading || sessionLoading}
-                    className="app-soft inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--foreground)] disabled:opacity-50"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg app-surface text-[var(--foreground)] disabled:opacity-50"
                     aria-label="Start new chat"
                     title="New Chat"
                   >
@@ -642,13 +895,41 @@ export function AgentChatWidget() {
                       <path d="M5 12h14" />
                     </svg>
                   </button>
-                  <button onClick={() => void sendMessage(chatInput)} disabled={loading || paused} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                  <button onClick={() => void sendMessage(chatInput)} disabled={loading || paused} className="h-10 rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-50">
                     {loading ? "..." : "Send"}
                   </button>
                 </div>
-              </div>
 
-              <div className="mt-3 shrink-0 flex flex-wrap items-center gap-1.5">
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-black/5 pt-2 dark:border-white/10">
+                <div
+                  className="relative"
+                  data-context-menu="root"
+                  onMouseEnter={() => setContextMenuOpen(true)}
+                  onMouseLeave={() => setContextMenuOpen(false)}
+                >
+                  <button
+                    className="rounded-md bg-[color-mix(in_oklab,var(--surface-soft)_86%,var(--surface)_14%)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
+                    aria-label="Context usage"
+                    title="Context usage"
+                    onFocus={() => setContextMenuOpen(true)}
+                    onBlur={() => setContextMenuOpen(false)}
+                    onClick={() => setContextMenuOpen((prev) => !prev)}
+                  >
+                    Context {contextUsage.percent}%
+                  </button>
+                  {contextMenuOpen ? (
+                    <div className="absolute bottom-full left-0 z-20 mb-2 w-[260px] rounded-md border border-black/10 app-surface p-2 text-[11px] shadow-xl dark:border-white/10">
+                      <p className="mb-1 font-semibold">Context sources in use</p>
+                      <div className="space-y-1">
+                      {contextUsage.sources.map((source) => (
+                        <p key={source.label} className="app-muted">
+                          {source.label}: {source.value} - {source.percent}%
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                </div>
                 <div className="app-soft rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
                   <label htmlFor="response-style">Style</label>
                   <select
@@ -688,6 +969,24 @@ export function AgentChatWidget() {
                   </select>
                 </div>
 
+                <div className="app-soft rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                  <label htmlFor="tool-permission">Tools</label>
+                  <select
+                    id="tool-permission"
+                    value={toolPermission}
+                    onChange={(e) => {
+                      const next = e.target.value as ToolPermission;
+                      setToolPermission(next);
+                      localStorage.setItem("demo_tool_permission", next);
+                    }}
+                    className="ml-1 rounded app-surface px-1 py-0 text-[10px]"
+                  >
+                    <option value="allow">Allow</option>
+                    <option value="request">Request</option>
+                    <option value="deny">Deny</option>
+                  </select>
+                </div>
+
                 <div ref={sessionMenuRef} className="relative">
                   <button
                     onClick={() => {
@@ -696,7 +995,7 @@ export function AgentChatWidget() {
                       setReasoningMenuOpen(false);
                       setRunsMenuOpen(false);
                     }}
-                    className="rounded-md bg-[color-mix(in_oklab,var(--surface-soft)_86%,var(--surface)_14%)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
+                    className="rounded-md bg-[color-mix(in_oklab,var(--surface-soft)_86%,var(--surface)_14%)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300"
                   >
                     Session History ({conversations.length})
                   </button>
@@ -733,7 +1032,7 @@ export function AgentChatWidget() {
                       setReasoningMenuOpen(false);
                       setRunsMenuOpen(false);
                     }}
-                    className="rounded-md bg-[color-mix(in_oklab,var(--surface-soft)_86%,var(--surface)_14%)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"
+                    className="rounded-md bg-[color-mix(in_oklab,var(--surface-soft)_86%,var(--surface)_14%)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-300"
                   >
                     Actions
                   </button>
@@ -772,7 +1071,7 @@ export function AgentChatWidget() {
                       setActionsMenuOpen(false);
                       setRunsMenuOpen(false);
                     }}
-                    className="rounded-md bg-[color-mix(in_oklab,var(--surface-soft)_86%,var(--surface)_14%)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300"
+                    className="rounded-md bg-[color-mix(in_oklab,var(--surface-soft)_86%,var(--surface)_14%)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300"
                   >
                     Reasoning
                   </button>
@@ -806,6 +1105,12 @@ export function AgentChatWidget() {
                           <p className="mt-1 text-xs">{streamingDraft}</p>
                         </div>
                       ) : null}
+                      {streamingReasoning ? (
+                        <div className="mt-2 rounded-md app-soft px-2 py-1.5">
+                          <p className="app-muted text-[10px] font-bold uppercase tracking-wide">Reasoning Stream</p>
+                          <p className="mt-1 text-xs">{streamingReasoning}</p>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -818,7 +1123,7 @@ export function AgentChatWidget() {
                       setActionsMenuOpen(false);
                       setReasoningMenuOpen(false);
                     }}
-                    className="rounded-md bg-[color-mix(in_oklab,var(--surface-soft)_86%,var(--surface)_14%)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300"
+                    className="rounded-md bg-[color-mix(in_oklab,var(--surface-soft)_86%,var(--surface)_14%)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-300"
                   >
                     Runs ({runs.length})
                   </button>
@@ -852,6 +1157,7 @@ export function AgentChatWidget() {
                       </div>
                     </div>
                   ) : null}
+                </div>
                 </div>
               </div>
             </div>

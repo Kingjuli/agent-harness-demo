@@ -1,3 +1,4 @@
+// Cart mutation/read tools with strict schemas.
 import { z } from "zod";
 import { PRODUCT_CATALOG } from "@/lib/data/seeds";
 import { ToolDefinition } from "@/lib/tools/contracts";
@@ -66,6 +67,39 @@ export const cartUpdateTool: ToolDefinition<typeof cartUpdateInput, typeof cartU
         currency: "USD",
       },
       selectedSku: product.sku,
+    };
+  },
+};
+
+export const cartViewInput = z.object({});
+
+export const cartViewOutput = z.object({
+  cart: z.object({
+    items: z.array(
+      z.object({
+        sku: z.string(),
+        name: z.string(),
+        color: z.string(),
+        size: z.string(),
+        quantity: z.number(),
+        unitPriceCents: z.number(),
+      }),
+    ),
+    subtotalCents: z.number(),
+    shippingCents: z.number(),
+    totalCents: z.number(),
+    currency: z.literal("USD"),
+  }),
+});
+
+export const cartViewTool: ToolDefinition<typeof cartViewInput, typeof cartViewOutput> = {
+  name: "cart_view",
+  description: "Read the latest persisted cart snapshot for display.",
+  inputSchema: cartViewInput,
+  outputSchema: cartViewOutput,
+  async execute(_input, ctx) {
+    return {
+      cart: ctx.state.cart,
     };
   },
 };

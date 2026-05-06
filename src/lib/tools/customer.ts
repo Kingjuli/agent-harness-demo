@@ -1,3 +1,4 @@
+// Customer details update tool and validation schema.
 import { z } from "zod";
 import { ToolDefinition } from "@/lib/tools/contracts";
 
