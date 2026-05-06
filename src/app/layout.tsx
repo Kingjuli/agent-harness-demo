@@ -13,8 +13,8 @@ const displayFont = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Agent Harness Demo",
-  description: "AI-assisted apparel checkout demo with a transparent harness view.",
+  title: "Moringa Apparrels",
+  description: "Moringa Apparrels shopping experience with AI-assisted checkout.",
 };
 
 export default function RootLayout({
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${bodyFont.variable} ${displayFont.variable} h-full antialiased`}>
+    <html lang="en" data-theme="light" className={`${bodyFont.variable} ${displayFont.variable} h-full antialiased`}>
       <body className="min-h-full">{children}</body>
     </html>
   );

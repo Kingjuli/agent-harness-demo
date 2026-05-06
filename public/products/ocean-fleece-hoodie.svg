@@ -1,0 +1,20 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Ocean Fleece Hoodie</title>
+  <desc id="desc">Blue hoodie product visual</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0C4A6E"/>
+      <stop offset="100%" stop-color="#0369A1"/>
+    </linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7DD3FC"/>
+      <stop offset="100%" stop-color="#0284C7"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <circle cx="240" cy="170" r="160" fill="#FFFFFF22"/>
+  <rect x="250" y="175" width="700" height="625" rx="84" fill="#082F4980"/>
+  <path d="M370 380C370 290 440 220 530 220H670C760 220 830 290 830 380V710H370V380Z" fill="url(#cloth)"/>
+  <path d="M530 220C530 175 565 140 610 140C655 140 690 175 690 220V280H530V220Z" fill="#0369A1"/>
+  <text x="70" y="820" fill="#E0F2FE" font-family="Arial" font-size="52" font-weight="700">Ocean Fleece Hoodie</text>
+</svg>

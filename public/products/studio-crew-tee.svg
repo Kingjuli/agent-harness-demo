@@ -1,0 +1,20 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Studio Crew Tee</title>
+  <desc id="desc">White t-shirt product visual</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FAFC"/>
+      <stop offset="100%" stop-color="#CBD5E1"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <circle cx="210" cy="170" r="170" fill="#FFFFFF1F"/>
+  <rect x="210" y="170" width="780" height="610" rx="60" fill="#0F172A75"/>
+  <path d="M400 330L500 240H700L800 330L740 420H660V700H540V420H460L400 330Z" fill="url(#cloth)"/>
+  <rect x="560" y="260" width="80" height="45" rx="20" fill="#94A3B8"/>
+  <text x="80" y="820" fill="#E2E8F0" font-family="Arial" font-size="56" font-weight="700">Studio Crew Tee</text>
+</svg>

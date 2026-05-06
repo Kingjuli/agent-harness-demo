@@ -183,5 +183,6 @@ export interface AgentTurnResult {
   updatedState: SessionState;
   toolTrace: ToolTrace[];
   harnessEvents: HarnessEvent[];
+  reasoningTrace?: string[];
   status: "ok" | "needs_input" | "escalated" | "error";
 }

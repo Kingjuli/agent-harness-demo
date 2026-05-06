@@ -5,7 +5,7 @@ export function Card({ children, className = "" }: PropsWithChildren<{ className
   return (
     <div
       className={clsx(
-        "glass-panel rounded-2xl border border-white/70 p-5 shadow-[0_12px_30px_-18px_rgba(15,23,42,0.45)]",
+        "glass-panel app-surface rounded-lg p-5 shadow-[0_18px_40px_-26px_rgba(15,23,42,0.35)]",
         className,
       )}
     >
@@ -15,5 +15,5 @@ export function Card({ children, className = "" }: PropsWithChildren<{ className
 }
 
 export function SectionTitle({ children }: PropsWithChildren) {
-  return <h3 className="text-xs font-bold tracking-[0.18em] text-slate-500 uppercase">{children}</h3>;
+  return <h3 className="app-muted text-sm font-semibold tracking-wide uppercase">{children}</h3>;
 }

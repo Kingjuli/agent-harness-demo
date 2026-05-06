@@ -1,0 +1,20 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Cloud Knit Hoodie</title>
+  <desc id="desc">Gray hoodie product visual</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1F2937"/>
+      <stop offset="100%" stop-color="#4B5563"/>
+    </linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D1D5DB"/>
+      <stop offset="100%" stop-color="#6B7280"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <circle cx="240" cy="170" r="160" fill="#FFFFFF18"/>
+  <rect x="250" y="175" width="700" height="625" rx="84" fill="#11182780"/>
+  <path d="M370 380C370 290 440 220 530 220H670C760 220 830 290 830 380V710H370V380Z" fill="url(#cloth)"/>
+  <path d="M530 220C530 175 565 140 610 140C655 140 690 175 690 220V280H530V220Z" fill="#4B5563"/>
+  <text x="70" y="820" fill="#E5E7EB" font-family="Arial" font-size="56" font-weight="700">Cloud Knit Hoodie</text>
+</svg>
