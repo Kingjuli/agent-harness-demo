@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UserSession {
+  id               String                @id @default(cuid())
+  userId           String
+  currentStep      String                @default("browsing")
+  status           String                @default("active")
+  stateJson        Json
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  messages         ConversationMessage[]
+  traces           HarnessTrace[]
+  orders           OrderRecord[]
+  escalationTickets EscalationTicket[]
+
+  @@index([userId])
+}
+
+model ConversationMessage {
+  id         String   @id @default(cuid())
+  sessionId  String
+  role       String
+  content    String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  session    UserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+model OrderRecord {
+  id           String   @id @default(cuid())
+  sessionId    String
+  orderRef     String   @unique
+  status       String
+  customerName String?
+  email        String?
+  phone        String?
+  address      String?
+  totalCents   Int
+  currency     String   @default("USD")
+  payload      Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  session      UserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  payments     PaymentRecord[]
+
+  @@index([sessionId])
+}
+
+model PaymentRecord {
+  id             String   @id @default(cuid())
+  orderId        String
+  paymentRef     String   @unique
+  status         String
+  amountCents    Int
+  currency       String   @default("USD")
+  method         String
+  statusChecks   Int      @default(0)
+  providerMeta   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  order          OrderRecord @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model HarnessTrace {
+  id         String   @id @default(cuid())
+  sessionId  String
+  node       String
+  detail     Json
+  createdAt  DateTime @default(now())
+  session    UserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+model EscalationTicket {
+  id          String   @id @default(cuid())
+  sessionId   String
+  reason      String
+  context     Json
+  status      String   @default("open")
+  createdAt   DateTime @default(now())
+  session     UserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
