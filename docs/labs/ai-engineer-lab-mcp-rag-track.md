@@ -3,9 +3,6 @@
 ## Audience
 Engineers shipping AI features into real products.
 
-## Duration
-20 minutes.
-
 ## What You’ll Walk Away With
 By the end of this lab, you should be able to:
 1. Explain MCP architecture across transport, tool contract, orchestration, and retrieval layers.
@@ -32,7 +29,7 @@ user asks shipping quote
 
 ---
 
-## Module 1 (6 min): Boundaries and Integration Path
+## Boundaries and Integration Path
 
 ## Why this matters
 When a quote is wrong or a tool fails, the fastest fix comes from knowing exactly which layer owns the problem. This section makes those boundaries explicit.
@@ -67,7 +64,7 @@ If a shipping quote fails, can you name the owner layer before writing a fix?
 
 ---
 
-## Module 2 (8 min): Hybrid RAG Retrieval and Confidence
+## Hybrid RAG Retrieval and Confidence
 
 ## Why this matters
 Vector-only search often looks good in demos, then misses real-world phrasing. Hybrid retrieval is more forgiving and more reliable under messy user input.
@@ -112,7 +109,7 @@ Can you explain why this pipeline avoids returning a confident but wrong destina
 
 ---
 
-## Module 3 (6 min): Measurement and Release Readiness
+## Measurement and Release Readiness
 
 ## Why this matters
 If you do not measure retrieval quality, you cannot trust improvements. This section turns quality into concrete numbers.

@@ -3,9 +3,6 @@
 ## Audience
 Engineers shipping AI features with limited time and small teams.
 
-## Duration
-20 minutes.
-
 ## What You’ll Walk Away With
 By the end of this lab, you should be able to:
 1. Explain where LlamaIndex reduces custom engineering effort in agentic systems.
@@ -24,7 +21,7 @@ Most teams can build agentic demos quickly but lose time on infrastructure code.
 
 ---
 
-## Module 1 (6 min): What Work LlamaIndex Removes
+## What Work LlamaIndex Removes
 
 ## Key point
 LlamaIndex removes repetitive plumbing so engineers can focus on domain logic.
@@ -60,7 +57,7 @@ Can you name two components you should not hand-build for v1?
 
 ---
 
-## Module 2 (8 min): Minimal LlamaIndex Agent Stack
+## Minimal LlamaIndex Agent Stack
 
 ## Key point
 Start with the smallest stack that supports retrieval + tool use + guardrails.
@@ -100,7 +97,7 @@ Can you explain what remains your responsibility after adopting framework primit
 
 ---
 
-## Module 3 (6 min): Integration Strategy and Tradeoffs
+## Integration Strategy and Tradeoffs
 
 ## Key point
 Framework acceleration is useful only if boundaries and reliability remain clear.

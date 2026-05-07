@@ -3,9 +3,6 @@
 ## Audience
 Engineers building production AI features (backend, frontend, platform).
 
-## Duration
-~49 minutes (7 blocks × 7 minutes).
-
 ## Lab goal
 Move from "prompting as a trick" to "AI as a governed software system" using this codebase.
 
@@ -20,7 +17,7 @@ Move from "prompting as a trick" to "AI as a governed software system" using thi
 
 ---
 
-## Block 1 (7 min): Why Prompting Is a Feature, Not the Product
+## Why Prompting Is a Feature, Not the Product
 
 ## Problem this solves
 Teams ship demos that work in notebooks but fail in production due to lack of controls.
@@ -42,7 +39,7 @@ Explain the maturity jump:
 
 ---
 
-## Block 2 (7 min): Reasoning Layer (Model Planning Loop)
+## Reasoning Layer (Model Planning Loop)
 
 ## Problem this solves
 How does the model decide whether to answer directly or call tools?
@@ -66,7 +63,7 @@ Show where reasoning starts and where harness takes over.
 
 ---
 
-## Block 3 (7 min): Tool Calling as Capability Extension
+## Tool Calling as Capability Extension
 
 ## Problem this solves
 Model knowledge alone cannot mutate real systems safely.
@@ -103,7 +100,7 @@ Show one request that triggers 1+ tool calls and inspect `toolTrace`.
 
 ---
 
-## Block 4 (7 min): Human-in-the-Loop (HITL) Approval Gate
+## Human-in-the-Loop (HITL) Approval Gate
 
 ## Problem this solves
 Prevent unauthorized or risky side effects.
@@ -147,7 +144,7 @@ No tool side effects before approval.
 
 ---
 
-## Block 5 (7 min): Self-Correction and Recovery Loop
+## Self-Correction and Recovery Loop
 
 ## Problem this solves
 Tool/API failure should degrade gracefully, not crash the workflow.
@@ -173,7 +170,7 @@ Force a tool error temporarily and inspect `harnessEvents` + `recoveryNotes`.
 
 ---
 
-## Block 6 (7 min): Prompt Contract + GenUI Signaling
+## Prompt Contract + GenUI Signaling
 
 ## Problem this solves
 How the model requests UI affordances without brittle keyword routing.
@@ -196,7 +193,7 @@ Ask model to update contact details and verify it emits form intent + UI renders
 
 ---
 
-## Block 7 (7 min): MCP Positioning for Real Integrations
+## MCP Positioning for Real Integrations
 
 ## Problem this solves
 Avoid connector sprawl when integrating local/enterprise systems.
