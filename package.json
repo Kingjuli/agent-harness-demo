@@ -8,6 +8,8 @@
     "start": "next start",
     "mcp:shipping": "node src/mcp/shipping-server/server.mjs",
     "mcp:shipping:http": "node src/mcp/shipping-server/http-server.mjs",
+    "mcp:shipping:llamaindex": "node src/mcp/shipping-server-llamaindex/server.mjs",
+    "mcp:shipping:llamaindex:http": "node src/mcp/shipping-server-llamaindex/http-server.mjs",
     "mcp:shipping:eval": "node src/mcp/shipping-server/eval/run-eval.mjs",
     "lint": "eslint",
     "test": "vitest run",

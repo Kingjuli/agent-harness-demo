@@ -78,7 +78,10 @@ function parseStructuredOrText<T>(result: unknown): T {
 }
 
 export async function getShippingQuoteViaMcp(address: string): Promise<ShippingQuoteResponse> {
-  const serverPath = path.resolve(process.cwd(), "src/mcp/shipping-server/server.mjs");
+  const variant = (process.env.SHIPPING_MCP_SERVER_VARIANT ?? "classic").toLowerCase();
+  const serverPath = variant === "llamaindex"
+    ? path.resolve(process.cwd(), "src/mcp/shipping-server-llamaindex/server.mjs")
+    : path.resolve(process.cwd(), "src/mcp/shipping-server/server.mjs");
 
   const client = new Client(
     { name: "agent-harness-demo", version: "0.1.0" },
