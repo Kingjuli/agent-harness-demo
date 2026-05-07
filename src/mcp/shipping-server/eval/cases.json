@@ -1,0 +1,14 @@
+[
+  { "query": "Westlands, Nairobi", "expectedCode": "NBO-WESTLANDS" },
+  { "query": "Kilimani Nairobi", "expectedCode": "NBO-KILIMANI" },
+  { "query": "Lavington", "expectedCode": "NBO-LAVINGTON" },
+  { "query": "Karen", "expectedCode": "NBO-KAREN" },
+  { "query": "Ruiru", "expectedCode": "NBO-RUIRU" },
+  { "query": "Thika town", "expectedCode": "NBO-THIKA" },
+  { "query": "Nyali Mombasa", "expectedCode": "MSA-NYALI" },
+  { "query": "Mtwapa", "expectedCode": "MSA-MTWAPA" },
+  { "query": "Milimani Kisumu", "expectedCode": "KSM-MILIMANI" },
+  { "query": "Pioneer Eldoret", "expectedCode": "ELD-PIONEER" },
+  { "query": "Lanet Nakuru", "expectedCode": "NKR-LANET" },
+  { "query": "Kisii Town", "expectedCode": "KII-TOWN" }
+]

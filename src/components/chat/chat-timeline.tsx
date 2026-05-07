@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { memo, useEffect, useMemo, useRef, useState, type TouchEvent, type WheelEvent } from "react";
 import { shortJson, type TimelineItem } from "@/components/chat/types";
+import { formatToolDisplayName, formatToolLogName } from "@/lib/tools/labels";
 
 function parseNextSteps(content: string) {
   const nextSteps: string[] = [];
@@ -35,7 +36,7 @@ const ToolChip = memo(function ToolChip({ item }: { item: Extract<TimelineItem, 
   const outputText = useMemo(() => shortJson(item.output, 5000), [item.output]);
 
   async function copyPayload() {
-    const text = `tool: ${item.tool}\nstatus: ${item.ok ? "ok" : "failed"}\ninput: ${inputText}\noutput: ${outputText}`;
+    const text = `tool: ${formatToolLogName(item.tool)}\nstatus: ${item.ok ? "ok" : "failed"}\ninput: ${inputText}\noutput: ${outputText}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -49,7 +50,7 @@ const ToolChip = memo(function ToolChip({ item }: { item: Extract<TimelineItem, 
     <div className="text-left">
       <details className="inline-block max-w-[95%] rounded-md app-soft px-2.5 py-1.5 text-xs">
         <summary className="flex cursor-pointer list-none items-center gap-2">
-          <span className="font-mono font-semibold">{item.tool}</span>
+          <span className="font-mono font-semibold">{formatToolDisplayName(item.tool)}</span>
           <span className={item.ok ? "text-emerald-600" : "text-rose-600"}>{item.ok ? "ok" : "failed"}</span>
           {item.reason ? <span className="app-muted truncate">- {item.reason}</span> : null}
           <span className="app-muted">in/out</span>
@@ -370,7 +371,7 @@ export function ChatTimeline({
                     if (traceItem.kind === "tool") {
                       return (
                         <p key={traceItem.id}>
-                          <span className="font-mono font-semibold">{traceItem.tool}</span>
+                          <span className="font-mono font-semibold">{formatToolDisplayName(traceItem.tool)}</span>
                           <span className={`ml-1 ${traceItem.ok ? "text-emerald-600" : "text-rose-600"}`}>{traceItem.ok ? "ok" : "failed"}</span>
                           {traceItem.reason ? <span className="app-muted"> - {traceItem.reason}</span> : null}
                         </p>

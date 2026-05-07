@@ -7,6 +7,7 @@ import type { ToolPermission } from "@/lib/harness/types";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { ChatTimeline } from "@/components/chat/chat-timeline";
 import { shortJson, statusTone, type AgentChatResponse, type ChatMessage, type SessionDetailResponse, type SessionListResponse, type TimelineItem } from "@/components/chat/types";
+import { formatToolDisplayName, formatToolLogName } from "@/lib/tools/labels";
 
 type RunStatus = "running" | "blocked" | "done" | "failed";
 type LiveTraceStep = {
@@ -573,7 +574,7 @@ export function AgentChatWidget() {
           setLiveTrace((prev) =>
             upsertTraceStep(prev, {
               id: `${runId}-tool-${toolName}`,
-              label: toolName.replace(/_/g, " "),
+              label: formatToolDisplayName(toolName),
               detail: `Calling with ${shortJson(input, 80)}`,
               status: "active",
             }),
@@ -581,11 +582,11 @@ export function AgentChatWidget() {
         },
         onToolEnd: (trace) => {
           streamedTrace.push(trace);
-          schedulePhase(`Completed ${trace.tool.replace(/_/g, " ")}`, { debounceMs: 260 });
+          schedulePhase(`Completed ${formatToolDisplayName(trace.tool)}`, { debounceMs: 260 });
           setLiveTrace((prev) =>
             upsertTraceStep(prev, {
               id: `${runId}-tool-${trace.tool}`,
-              label: trace.tool.replace(/_/g, " "),
+              label: formatToolDisplayName(trace.tool),
               detail: trace.ok ? `Returned ${shortJson(trace.output, 80)}` : `Failed: ${shortJson(trace.output, 80)}`,
               status: trace.ok ? "done" : "failed",
             }),
@@ -617,7 +618,7 @@ export function AgentChatWidget() {
       const nextState = data.updatedState;
       setState(nextState);
 
-      const steps = ["planning", ...nextEvents.map((ev) => ev.stage), ...nextTrace.map((tool) => `tool:${tool.tool}`), "response"];
+      const steps = ["planning", ...nextEvents.map((ev) => ev.stage), ...nextTrace.map((tool) => `tool:${formatToolLogName(tool.tool)}`), "response"];
       const traceItems = traceFromResponse(runId, nextEvents, nextTrace);
       updateRun(runId, {
         steps,
@@ -696,7 +697,9 @@ export function AgentChatWidget() {
     const approvalRequestId = pendingToolApproval.approvalRequestId;
     const requestedTools = pendingToolApproval.requestedTools;
     setPendingToolApproval(null);
-    setToolApprovalNotice(approved ? `Tools approved: ${requestedTools.join(", ") || "requested tools"}` : "Tool request denied");
+    setToolApprovalNotice(
+      approved ? `Tools approved: ${requestedTools.map((tool) => formatToolDisplayName(tool)).join(", ") || "requested tools"}` : "Tool request denied",
+    );
     setLoading(true);
     try {
       const res = await fetch("/api/agent/chat", {
@@ -832,7 +835,7 @@ export function AgentChatWidget() {
                       <span className="font-semibold text-amber-700 dark:text-amber-300">Tool permission requested</span>
                       <span className="app-muted">{pendingToolApproval.reason ?? "Approve to continue with tool-backed actions."}</span>
                       {pendingToolApproval.requestedTools.length > 0 ? (
-                        <span className="app-muted">Tools: {pendingToolApproval.requestedTools.join(", ")}</span>
+                        <span className="app-muted">Tools: {pendingToolApproval.requestedTools.map((tool) => formatToolDisplayName(tool)).join(", ")}</span>
                       ) : null}
                     </div>
                     <div className="mt-1 flex items-center gap-1.5">

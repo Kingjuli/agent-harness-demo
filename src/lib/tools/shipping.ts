@@ -1,7 +1,7 @@
 // Shipping quote tool for checkout totals.
 import { z } from "zod";
 import { ToolDefinition } from "@/lib/tools/contracts";
-import { searchShippingCandidatesViaMcp } from "@/lib/mcp/shipping-client";
+import { getShippingQuoteViaMcp } from "@/lib/mcp/shipping-client";
 
 export const shippingQuoteInput = z.object({
   address: z.string().min(3),
@@ -19,8 +19,8 @@ export const shippingQuoteTool: ToolDefinition<typeof shippingQuoteInput, typeof
   inputSchema: shippingQuoteInput,
   outputSchema: shippingQuoteOutput,
   async execute(input) {
-    const candidates = await searchShippingCandidatesViaMcp(input.address);
-    const best = candidates[0];
+    const quote = await getShippingQuoteViaMcp(input.address);
+    const best = quote.best;
     if (!best) {
       throw new Error("No shipping candidates returned by MCP server");
     }

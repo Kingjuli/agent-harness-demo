@@ -1,6 +1,7 @@
 // Deterministic state transition helpers applied after tool execution.
 import { PRODUCT_CATALOG } from "@/lib/data/seeds";
 import { createEmptyState } from "@/lib/harness/state";
+import { formatToolDisplayName } from "@/lib/tools/labels";
 import {
   AgentTurnResult,
   Cart,
@@ -73,7 +74,7 @@ export function toolPlan(toolTrace: ToolTrace[]): HarnessPlanStep[] {
 
   return toolTrace.map((trace, index) => ({
     id: `${trace.tool}_${index + 1}`,
-    label: trace.tool.replaceAll("_", " "),
+    label: formatToolDisplayName(trace.tool),
     tool: trace.tool,
     reason: trace.reason ?? "Selected by the LangGraph agent.",
     status: trace.ok ? "done" : "blocked",

@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "mcp:shipping": "node src/mcp/shipping-server/server.mjs",
+    "mcp:shipping:http": "node src/mcp/shipping-server/http-server.mjs",
+    "mcp:shipping:eval": "node src/mcp/shipping-server/eval/run-eval.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",

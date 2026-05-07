@@ -38,6 +38,12 @@ cp .env.example .env.local
 ```
 Update `DATABASE_URL` and `OPENAI_API_KEY`.
 
+If you want local Postgres with pgvector pre-enabled:
+```bash
+docker compose up -d
+docker compose exec postgres psql -U postgres -d agent_harness_demo -c "SELECT extname FROM pg_extension WHERE extname='vector';"
+```
+
 3. Generate Prisma client
 ```bash
 npm run prisma:generate

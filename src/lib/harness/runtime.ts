@@ -32,6 +32,7 @@ import {
   toolPlan,
 } from "@/lib/harness/state-machine";
 import { getChatModel, type ReasoningEffort } from "@/lib/llm/openai";
+import { formatToolDisplayName, formatToolLogName } from "@/lib/tools/labels";
 import { TOOL_REGISTRY } from "@/lib/tools/registry";
 import { AgentTurnResult, HarnessEvent, SessionState, ToolTrace } from "@/lib/types/domain";
 import { AgentStreamEvent, AgentStreamSink, ResponseStyle, ToolPermission } from "@/lib/harness/types";
@@ -86,12 +87,12 @@ function createAgentTools(sessionId: string, stateRef: { current: SessionState }
           const output = definition.outputSchema.parse(rawOutput) as Record<string, unknown>;
           stateRef.current = applyToolOutput(stateRef.current, definition.name, parsedInput, output);
           const trace = { tool: definition.name, input: parsedInput, output, ok: true, reason: "Selected by LangGraph ReAct agent." };
-          const toolEvent = event("tool", definition.name, `Executed with input ${JSON.stringify(parsedInput)}.`);
+          const toolEvent = event("tool", formatToolDisplayName(definition.name), `Executed ${formatToolLogName(definition.name)} with input ${JSON.stringify(parsedInput)}.`);
           traces.push(trace);
           harnessEvents.push(toolEvent);
           await emit(onStream, { type: "tool_end", trace });
           await emit(onStream, { type: "event", event: toolEvent });
-          await appendTrace(sessionId, "agent_tool", { tool: definition.name, input: parsedInput, output });
+          await appendTrace(sessionId, "agent_tool", { tool: formatToolLogName(definition.name), input: parsedInput, output });
 
           return JSON.stringify({
             ok: true,
@@ -110,7 +111,7 @@ function createAgentTools(sessionId: string, stateRef: { current: SessionState }
           harnessEvents.push(recoveryEvent);
           await emit(onStream, { type: "tool_end", trace });
           await emit(onStream, { type: "event", event: recoveryEvent });
-          await appendTrace(sessionId, "agent_tool_error", { tool: definition.name, input: parsedInput, error: detail });
+          await appendTrace(sessionId, "agent_tool_error", { tool: formatToolLogName(definition.name), input: parsedInput, error: detail });
           throw error;
         }
       },
